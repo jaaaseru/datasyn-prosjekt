@@ -1,7 +1,7 @@
 import numpy as np
-# import cv2
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
+import cv2
 
 import pandas as pd
 from keras.models import Sequential
@@ -13,7 +13,7 @@ from keras.preprocessing.image import ImageDataGenerator
 
 # preprocessing
 
-data = pd.read_csv('training_data/driving_log.csv',
+data = pd.read_csv('training_data2/driving_log.csv',
 names = ['center', 'left', 'right', 'angle', 'throttle', 'brake', 'speed'])
 
 # Remove speed, brake and time
@@ -27,7 +27,6 @@ data_r = data.drop(['center', 'left'], axis = 1)
 
 # Check how our data is distributed
 histogram = data_c.hist(column = 'angle', bins = 12)
-#plt.show()
 
 # Remove data so it contains equal amounts of left, right, forward
 # Remove 80% of forward data
@@ -38,7 +37,7 @@ data_c = data_c[np.invert(indx)].reset_index(drop=True)
 
 data_c = pd.concat([zero_angles, data_c], ignore_index = True)
 histogram2 = data_c.hist(column = 'angle', bins = 12)
-#plt.show()
+
 
 # Correct offset for left and right datasets
 offset = 0.1 # Tunable parameter
@@ -51,11 +50,43 @@ data_l = data_l.rename({'left': 'image'}, axis = 'columns')
 data_c = data_c.rename({'center': 'image'}, axis = 'columns')
 
 data = pd.concat([data_c, data_l, data_r], ignore_index = True)
-data = data.drop('index', axis = 1)
-print(data.axes)
-print(data)
 histogram3 = data.hist(column='angle', bins = 12)
 #plt.show()
+
+# Read images to arrays
+def readImg(image_path):
+    # Using matplotlib
+    img  = cv2.imread(image_path, 1)
+
+    # remove bottom 20 and top 20 pixels
+    # These contain background and part of the car
+    img = img[20:-20,:,:]
+
+    #resize to fit dave-2 network architecture
+    img = cv2.resize(img, (200,66), interpolation = cv2.INTER_LINEAR)
+    return img
+
+xdata = []
+for img in data["image"]:
+    xdata.append(readImg(img))
+xdata = np.asarray(xdata)
+ydata = np.asarray(data["angle"])
+
+
+# Divide into training and validation set
+indx = np.arange(0, xdata.shape[0])
+np.random.shuffle(indx)
+
+#Validation split should be small (5%)
+train_length = int(xdata.shape[0] * 0.95)
+xtrain = xdata[indx[0:train_length]]
+ytrain = ydata[indx[0:train_length]]
+
+xval = xdata[indx[train_length:]]
+yval = ydata[indx[train_length:]]
+
+# Preprocess images
+# TODO: image brightness changer
 
 
 # Network
@@ -87,9 +118,13 @@ model.summary()
 
 
 
-
-
 # Train the network
+BATCH_SIZE = 100
+EPOCHS = 10
+SAMPLES = len(xtrain)
+datagen = ImageDataGenerator(shear_range = 0.1)
+model.fit_generator(datagen.flow(xtrain, ytrain, batch_size = BATCH_SIZE),
+samples_per_epoch = SAMPLES, epochs = EPOCHS, validation_data = (xval, yval))
 
 
 
