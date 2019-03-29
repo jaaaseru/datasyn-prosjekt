@@ -13,30 +13,32 @@ from keras.preprocessing.image import ImageDataGenerator
 
 # preprocessing
 
-data = pd.read_csv('training_data2/driving_log.csv',
+data = pd.read_csv('training_data3/driving_log.csv',
 names = ['center', 'left', 'right', 'angle', 'throttle', 'brake', 'speed'])
 
 # Remove speed, brake and time
 data = data.drop(['throttle', 'brake', 'speed'], axis = 1)
+
+
+# Check how our data is distributed
+#histogram = data_c.hist(column = 'angle', bins = 12)
+
+# Remove data so it contains equal amounts of left, right, forward
+# Remove 80% of forward data
+indx = data['angle'] == 0
+zero_angles = data[indx]
+zero_angles = zero_angles.sample(frac = 0.1).reset_index(drop=True)
+data = data[np.invert(indx)].reset_index(drop=True)
+
+data = pd.concat([zero_angles, data], ignore_index = True)
+#histogram2 = data_c.hist(column = 'angle', bins = 12)
+
 # Divide dataset into left, right and center
 data_c = data.drop(['left', 'right'], axis = 1)
 
 #  May want to remove some of the data here as well
 data_l = data.drop(['center', 'right'], axis = 1)
 data_r = data.drop(['center', 'left'], axis = 1)
-
-# Check how our data is distributed
-histogram = data_c.hist(column = 'angle', bins = 12)
-
-# Remove data so it contains equal amounts of left, right, forward
-# Remove 80% of forward data
-indx = data_c['angle'] == 0
-zero_angles = data_c[indx]
-zero_angles = zero_angles.sample(frac = 0.2).reset_index(drop=True)
-data_c = data_c[np.invert(indx)].reset_index(drop=True)
-
-data_c = pd.concat([zero_angles, data_c], ignore_index = True)
-histogram2 = data_c.hist(column = 'angle', bins = 12)
 
 
 # Correct offset for left and right datasets
@@ -51,7 +53,7 @@ data_c = data_c.rename({'center': 'image'}, axis = 'columns')
 
 data = pd.concat([data_c, data_l, data_r], ignore_index = True)
 histogram3 = data.hist(column='angle', bins = 12)
-#plt.show()
+plt.show()
 
 # Read images to arrays
 def readImg(image_path):
@@ -84,6 +86,8 @@ ytrain = ydata[indx[0:train_length]]
 
 xval = xdata[indx[train_length:]]
 yval = ydata[indx[train_length:]]
+
+print(xtrain.shape)
 
 # Preprocess images
 # TODO: image brightness changer

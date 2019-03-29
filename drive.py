@@ -66,6 +66,10 @@ def telemetry(sid, data):
         image_array = image_array[...,::-1]
         image_array = cv2.cvtColor(image_array, cv2.COLOR_BGR2HSV)
         image_array = (image_array/255)-0.5
+        image_array= image_array[20:-20,:,:]
+
+        #resize to fit dave-2 network architecture
+        image_array = cv2.resize(image_array, (200,66), interpolation = cv2.INTER_LINEAR)
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
 
         throttle = controller.update(float(speed))
