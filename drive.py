@@ -72,8 +72,9 @@ def telemetry(sid, data):
         image_array = cv2.resize(image_array, (200,66), interpolation = cv2.INTER_LINEAR)
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
 
-        #throttle = controller.update(float(speed))/3
-        throttle = 1 - 0.09*abs(steering_angle)
+        throttle = controller.update(float(speed))
+        # Decrease throttle when turning
+        #throttle = 0.3 - 0.08*abs(steering_angle)
         print(steering_angle, throttle)
         send_control(steering_angle, throttle)
 

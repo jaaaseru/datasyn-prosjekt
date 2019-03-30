@@ -22,7 +22,11 @@ data = data.drop(['throttle', 'brake', 'speed'], axis = 1)
 
 # Check how our data is distributed
 #histogram = data_c.hist(column = 'angle', bins = 12)
-
+#indx = data['angle'] == 0
+#zero_angles = data[indx]
+#zero_angles = zero_angles.sample(frac = 0.3).reset_index(drop=True)
+#data = data[np.invert(indx)].reset_index(drop=True)
+#data = pd.concat([zero_angles, data], ignore_index = True)
 
 
 
@@ -38,6 +42,8 @@ zero_angles = data_c[indx]
 zero_angles = zero_angles.sample(frac = 0.3).reset_index(drop=True)
 data_c = data_c[np.invert(indx)].reset_index(drop=True)
 data_c = pd.concat([zero_angles, data_c], ignore_index = True)
+
+
 #  May want to remove some of the data here as well
 data_l = data.drop(['center', 'right'], axis = 1)
 data_r = data.drop(['center', 'left'], axis = 1)
@@ -93,6 +99,9 @@ xtrain = xdata[indx[0:train_length]]
 ytrain = ydata[indx[0:train_length]]
 
 xval = xdata[indx[train_length:]]
+#for i in range(len(xval)):
+#    xval[i]= cv2.cvtColor(xval[i], cv2.COLOR_BGR2HSV)
+
 yval = ydata[indx[train_length:]]
 
 print(xtrain.shape)
@@ -114,22 +123,30 @@ model.add(layers.BatchNormalization(input_shape=(66, 200,  3)))
 
 # Convolutional layers with 5x5 kernel and 2 stride
 model.add(layers.Conv2D(24, (5,5), strides = (2,2), activation='relu'))
+model.add(layers.BatchNormalization())
 model.add(layers.Conv2D(36, (5,5), strides =(2,2), activation='relu'))
+model.add(layers.BatchNormalization())
 model.add(layers.Conv2D(48, (5,5), strides =(2,2), activation='relu'))
+model.add(layers.BatchNormalization())
 
 # Non strided convolution with 3x3 kernel
 model.add(layers.Conv2D(64, (3, 3), strides =(1, 1), activation='relu'))
+model.add(layers.BatchNormalization())
 model.add(layers.Conv2D(64, (3, 3), strides =(1, 1), activation='relu'))
+model.add(layers.BatchNormalization())
 
 
 model.add(layers.Flatten())
 model.add(layers.Dense(100))
+model.add(layers.BatchNormalization())
 model.add(layers.Dense(50))
+model.add(layers.BatchNormalization())
 model.add(layers.Dense(10))
+model.add(layers.BatchNormalization())
 model.add(layers.Dense(1, activation='tanh', name='output'))
 
 
-adam = optimizers.Adam(lr = 0.0001, decay = 0.0)
+adam = optimizers.Adam(lr = 0.001, decay = 0.01)
 model.compile(optimizer = adam, loss = losses.mean_squared_error)
 
 model.summary()
@@ -144,6 +161,8 @@ datagen = ImageDataGenerator(shear_range = 0.0, preprocessing_function = brightn
 history = model.fit_generator(datagen.flow(xtrain, ytrain, batch_size = BATCH_SIZE),
 samples_per_epoch = SAMPLES, epochs = EPOCHS, validation_data = (xval, yval))
 
+model.save("model.h5")
+
 
 plt.plot(history.history['loss'])
 plt.plot(history.history['val_loss'])
@@ -151,8 +170,3 @@ plt.ylabel('loss')
 plt.xlabel('epoch')
 plt.legend(['training loss', 'validation loss'])
 plt.show()
-
-
-
-
-model.save("model.h5")
