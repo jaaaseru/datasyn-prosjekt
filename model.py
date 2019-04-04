@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import cv2
 
 import pandas as pd
@@ -11,6 +12,9 @@ from keras import losses
 from keras.utils import np_utils
 from keras.preprocessing.image import ImageDataGenerator
 
+
+SHOW_HISTOGRAMS = False
+PRINT_LIGHTNESS_EXAMPLES = False
 # preprocessing
 
 data = pd.read_csv('training_data3/driving_log.csv',
@@ -22,27 +26,36 @@ data = data.drop(['throttle', 'brake', 'speed'], axis = 1)
 
 # Check how our data is distributed
 #histogram = data_c.hist(column = 'angle', bins = 12)
-#indx = data['angle'] == 0
-#zero_angles = data[indx]
-#zero_angles = zero_angles.sample(frac = 0.3).reset_index(drop=True)
-#data = data[np.invert(indx)].reset_index(drop=True)
-#data = pd.concat([zero_angles, data], ignore_index = True)
+indx = data['angle'] == 0
+zero_angles = data[indx]
+zero_angles = zero_angles.sample(frac = 0.3).reset_index(drop=True)
+data = data[np.invert(indx)].reset_index(drop=True)
+data = pd.concat([zero_angles, data], ignore_index = True)
 
 
 
-#histogram2 = data_c.hist(column = 'angle', bins = 12)
+
 
 # Divide dataset into left, right and center
 data_c = data.drop(['left', 'right'], axis = 1)
+if(SHOW_HISTOGRAMS):
+    histogram = data_c.hist(column = 'angle', bins = 12)
+    plt.xlabel('Angle')
+    plt.ylabel('number of samples')
+    #plt.show()
 
 # Remove data so it contains equal amounts of left, right, forward
 # Remove 70% of forward data
-indx = data_c['angle'] == 0
-zero_angles = data_c[indx]
-zero_angles = zero_angles.sample(frac = 0.3).reset_index(drop=True)
-data_c = data_c[np.invert(indx)].reset_index(drop=True)
-data_c = pd.concat([zero_angles, data_c], ignore_index = True)
-
+#indx = data_c['angle'] == 0
+#zero_angles = data_c[indx]
+#zero_angles = zero_angles.sample(frac = 0.3).reset_index(drop=True)
+#data_c = data_c[np.invert(indx)].reset_index(drop=True)
+#data_c = pd.concat([zero_angles, data_c], ignore_index = True)
+if(SHOW_HISTOGRAMS):
+    histogram2 = data_c.hist(column = 'angle', bins = 12)
+    plt.xlabel('Angle')
+    plt.ylabel('number of samples')
+    #plt.show()
 
 #  May want to remove some of the data here as well
 data_l = data.drop(['center', 'right'], axis = 1)
@@ -60,13 +73,19 @@ data_l = data_l.rename({'left': 'image'}, axis = 'columns')
 data_c = data_c.rename({'center': 'image'}, axis = 'columns')
 
 data = pd.concat([data_c, data_l, data_r], ignore_index = True)
-histogram3 = data.hist(column='angle', bins = 12)
-plt.show()
+if(SHOW_HISTOGRAMS):
+    histogram3 = data.hist(column='angle', bins = 12)
+    plt.xlabel('Angle')
+    plt.ylabel('number of samples')
+    #plt.show()
 
 indx = data['angle'] != 0
 data_without_zero = data[indx]
-histogram3 = data_without_zero.hist(column='angle', bins = 2)
-plt.show()
+if(SHOW_HISTOGRAMS):
+    histogram4 = data_without_zero.hist(column='angle', bins = 2)
+    plt.xlabel('Angle')
+    plt.ylabel('number of samples')
+    plt.show()
 
 
 # Read images to arrays
@@ -97,7 +116,6 @@ np.random.shuffle(indx)
 train_length = int(xdata.shape[0] * 0.95)
 xtrain = xdata[indx[0:train_length]]
 ytrain = ydata[indx[0:train_length]]
-
 xval = xdata[indx[train_length:]]
 #for i in range(len(xval)):
 #    xval[i]= cv2.cvtColor(xval[i], cv2.COLOR_BGR2HSV)
@@ -112,9 +130,28 @@ def brightness_changer(image):
     LIGHTNESS = 2
     image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     randLightness = np.random.uniform(0.5, 1.25)
-    image[:,:,LIGHTNESS] = randLightness * image[:,:,LIGHTNESS]
+    image[:,:,LIGHTNESS] = np.clip(randLightness * image[:,:,LIGHTNESS],0,255)
     image =  cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
     return image
+
+# Visualization
+if(PRINT_LIGHTNESS_EXAMPLES):
+    NUMB_EXAMPLES = 3
+    fig = plt.figure()
+    for i in range(NUMB_EXAMPLES):
+
+        plt.subplot(3,3, 1+(i*3))
+        plt.axis('off')
+        plt.imshow(cv2.cvtColor(xtrain[i], cv2.COLOR_BGR2RGB))
+        plt.subplot(3,3, 2+(i*3))
+        plt.axis('off')
+        plt.imshow(cv2.cvtColor(brightness_changer(xtrain[i]), cv2.COLOR_BGR2RGB))
+        plt.subplot(3,3, 3+(i*3))
+        plt.axis('off')
+        plt.imshow(cv2.cvtColor(brightness_changer(xtrain[i]), cv2.COLOR_BGR2RGB))
+    plt.subplots_adjust(wspace=0.05,hspace=0.05)
+    #plt.tight_layout()
+    plt.show()
 
 # Network
 model = Sequential()
@@ -155,7 +192,7 @@ model.summary()
 
 # Train the network
 BATCH_SIZE = 100
-EPOCHS = 15
+EPOCHS = 10#15
 SAMPLES = len(xtrain)
 datagen = ImageDataGenerator(shear_range = 0.0, preprocessing_function = brightness_changer)
 history = model.fit_generator(datagen.flow(xtrain, ytrain, batch_size = BATCH_SIZE),
