@@ -17,18 +17,29 @@ SHOW_HISTOGRAMS = False
 PRINT_LIGHTNESS_EXAMPLES = False
 # preprocessing
 
-data = pd.read_csv('training_data3/driving_log.csv',
+data1 = pd.read_csv('training_data3/driving_log.csv',
+names = ['center', 'left', 'right', 'angle', 'throttle', 'brake', 'speed']) #OG data
+
+data2 = pd.read_csv('training_track2/driving_log.csv',
 names = ['center', 'left', 'right', 'angle', 'throttle', 'brake', 'speed'])
+
+#data3 = pd.read_csv('training_track1_forward/driving_log.csv',
+#names = ['center', 'left', 'right', 'angle', 'throttle', 'brake', 'speed'])
+
+#data4 = pd.read_csv('training_track1_backwards/driving_log.csv',
+#names = ['center', 'left', 'right', 'angle', 'throttle', 'brake', 'speed'])
+
+data = pd.concat([data1, data2])
 
 # Remove speed, brake and time
 data = data.drop(['throttle', 'brake', 'speed'], axis = 1)
 
-
+print(data.size)
 # Check how our data is distributed
 #histogram = data_c.hist(column = 'angle', bins = 12)
 indx = data['angle'] == 0
 zero_angles = data[indx]
-zero_angles = zero_angles.sample(frac = 0.3).reset_index(drop=True)
+zero_angles = zero_angles.sample(frac = 0.4).reset_index(drop=True)
 data = data[np.invert(indx)].reset_index(drop=True)
 data = pd.concat([zero_angles, data], ignore_index = True)
 
@@ -63,9 +74,22 @@ data_r = data.drop(['center', 'left'], axis = 1)
 
 
 # Correct offset for left and right datasets
-offset = 0.2 # Tunable parameter
+offset = 0.4 # Tunable parameter
 data_r['angle'] = data_r['angle'] - offset
 data_l['angle'] = data_l['angle'] + offset
+
+# remove some of the zero data here as well
+indx = data_r['angle'] == -offset
+zero_angles = data_r[indx]
+zero_angles = zero_angles.sample(frac = 1).reset_index(drop=True)
+data_r = data_r[np.invert(indx)].reset_index(drop=True)
+data_r = pd.concat([zero_angles, data_r], ignore_index = True)
+
+indx = data_l['angle'] == offset
+zero_angles = data_l[indx]
+zero_angles = zero_angles.sample(frac = 1).reset_index(drop=True)
+data_l = data_l[np.invert(indx)].reset_index(drop=True)
+data_l = pd.concat([zero_angles, data_l], ignore_index = True)
 
 # Put dataset together as one set of images
 data_r = data_r.rename({'right': 'image'}, axis = 'columns')
@@ -160,30 +184,43 @@ model.add(layers.BatchNormalization(input_shape=(66, 200,  3)))
 
 # Convolutional layers with 5x5 kernel and 2 stride
 model.add(layers.Conv2D(24, (5,5), strides = (2,2), activation='relu'))
+model.add(layers.Dropout(0.2))
 model.add(layers.BatchNormalization())
 model.add(layers.Conv2D(36, (5,5), strides =(2,2), activation='relu'))
+model.add(layers.Dropout(0.2))
 model.add(layers.BatchNormalization())
 model.add(layers.Conv2D(48, (5,5), strides =(2,2), activation='relu'))
+model.add(layers.Dropout(0.2))
 model.add(layers.BatchNormalization())
 
 # Non strided convolution with 3x3 kernel
-model.add(layers.Conv2D(64, (3, 3), strides =(1, 1), activation='relu'))
+model.add(layers.Conv2D(128, (3, 3), strides =(1, 1), activation='relu'))
+model.add(layers.Dropout(0.2))
 model.add(layers.BatchNormalization())
-model.add(layers.Conv2D(64, (3, 3), strides =(1, 1), activation='relu'))
+model.add(layers.Conv2D(256, (3, 3), strides =(1, 1), activation='relu'))
+model.add(layers.Dropout(0.2))
 model.add(layers.BatchNormalization())
+
 
 
 model.add(layers.Flatten())
+#model.add(layers.Dense(750))
+#model.add(layers.Dropout(0.5))
 model.add(layers.Dense(100))
+model.add(layers.Dropout(0.5))
 model.add(layers.BatchNormalization())
 model.add(layers.Dense(50))
+model.add(layers.Dropout(0.5))
 model.add(layers.BatchNormalization())
 model.add(layers.Dense(10))
+model.add(layers.Dropout(0.5))
 model.add(layers.BatchNormalization())
 model.add(layers.Dense(1, activation='tanh', name='output'))
 
 
 adam = optimizers.Adam(lr = 0.001, decay = 0.01)
+sgd = optimizers.SGD(lr=0.01, momentum=0.3, decay=0.01, nesterov=False)
+nadam = optimizers.Nadam(lr=0.01)
 model.compile(optimizer = adam, loss = losses.mean_squared_error)
 
 model.summary()
@@ -192,7 +229,7 @@ model.summary()
 
 # Train the network
 BATCH_SIZE = 100
-EPOCHS = 10#15
+EPOCHS = 25#15
 SAMPLES = len(xtrain)
 datagen = ImageDataGenerator(shear_range = 0.0, preprocessing_function = brightness_changer)
 history = model.fit_generator(datagen.flow(xtrain, ytrain, batch_size = BATCH_SIZE),
